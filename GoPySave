@@ -1,0 +1,87 @@
+from bs4 import BeautifulSoup
+import requests
+import time
+from selenium import webdriver
+from selenium.webdriver import ActionChains
+import random
+import csv
+import os
+directory = ('INSERT YOUR DESTINATION') #edit directory!
+
+input1 = input("Type search: ")
+input2 = input("How many sites: ")
+print('Auch nicht vergessen directory zu ändern?', input1, directory)
+input3 = input("y oder n, n für abbrechen ")
+
+if input3 == "y":
+
+    url_start = 'https://scholar.google.de/schhp?hl=de'
+    os.chdir(directory)
+
+    # selenium vorbereiten, chrome starten, fenster maximieren
+    driver = webdriver.Chrome("INSERT PATH TO  CHROME WEBDRIER") #edit path!
+    driver.delete_all_cookies()
+
+    #driver.maximize_window()
+    driver.get(url_start)
+
+    #suchfeld finden, suchbegriff eingeben, suchbutton klicken
+    search_field = driver.find_element_by_name("q")
+    search_field.send_keys(input1)
+    search_button = driver.find_element_by_xpath('/html/body/div/div[7]/div[1]/div[2]/form/button')
+    time.sleep(random.uniform(6,10))
+    buttonclick = ActionChains(driver).move_to_element(search_button).click()
+    buttonclick.perform()
+
+    #while schleife für begrenzte anzahl von seiten, per input definiert
+    x = int(1)
+    Seiten = int(input2)
+    linklist = []
+    while x <= Seiten:
+        url = (driver.current_url)
+        google = requests.get(url)
+        soup = BeautifulSoup(google.text, 'html.parser')
+
+        #html dokument speichern
+        htmldoc = (" seite_" + str(x))
+        html_code = (soup.prettify())
+        html = open(htmldoc+".html", 'w', encoding="utf-8")
+        html.write(html_code)
+        html.close()
+        x += 1
+        time.sleep(random.uniform(1,2))
+
+        #Linkliste erstellen, hängt immer die ganze seite links dran, sortiert dann direkt aus
+        for link_html in soup.find_all('a', href=True):
+            linklist.append(link_html['href'])
+            for link in linklist:
+                if any(s in link for s in ['java', '/scholar', '/citations', 'ASCII', 'www.google.de/intl']):
+                    linklist.remove(link)
+
+        #nächste seite mit weiter button klicken
+        weiterbutton = driver.find_element_by_xpath('//*[@id="gs_n"]/center/table/tbody/tr/td[12]/a/span')
+        time.sleep(random.uniform(1,2))
+        driver.execute_script('arguments[0].scrollIntoView();', weiterbutton)
+        time.sleep(random.uniform(2,5))
+        weiterbutton.click()
+
+        #wenn gewünschte zahl erreicht ist, driver beenden
+        if x == Seiten:
+            time.sleep(10)
+    print(linklist)
+    driver.quit()
+
+    #save csv
+    with open('linkliste_search_'+input1+'.csv', 'w', newline='') as csvfile:
+        for x in linklist:
+            writer = csv.writer(csvfile)
+            writer.writerow([x])
+
+    #linkliste in html
+    with open('linkliste_search_'+input1+'.html', 'w', encoding='utf-8') as htmlfile:
+        for x in linklist:
+            htmlfile.write("<p><a href="+x+">"+str(x)+"</a><p>")
+    htmlfile.close()
+
+else:
+    print("Ok, Abbruch.")
